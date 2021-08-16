@@ -14,8 +14,34 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 class WordFilterPlugin {
   function __construct() {
     add_action('admin_menu', array($this, 'pluginMenu'));
+    add_action('admin_init', array($this, 'pluginSettings'));
+    // If db contains a selected option for plugin_words_to_filter, apply filter logic
+    if (get_option('plugin_words_to_filter')) {
+      add_filter('the_content', array($this, 'filterLogic'));
+    }
   }
 
+  // REGISTER SETTINGS
+  function pluginSettings() {
+    add_settings_section('replacementTextSection', null, null, 'word-filter-options');
+    register_setting('replacementFields', 'replacementText');
+    add_settings_field('replacement-text', 'Filtered Text Appearance', array($this, 'replacementFieldHTML'), 'word-filter-options', 'replacementTextSection');
+  }
+
+  // HTML for options page
+  function replacementFieldHTML() { ?>
+    <input type="text" name="replacementText" value="<?php echo esc_attr(get_option('replacementText', '****'))?>">
+    <p class="description">Leave blank to simply remove the filtered words.</p>
+  <?php }
+
+  // FILTER LOGIC
+  function filterLogic($content) {
+    $badWords = explode(',', get_option('plugin_words_to_filter'));
+    $badWordsTrimmed = array_map('trim', $badWords);
+    return str_ireplace($badWordsTrimmed, esc_html(get_option('replacementText'), '****'), $content);
+  }
+
+  // ADD MENU ITEMS AND LINK TO STYLES
   function pluginMenu() {
     // Args: title, text in admin sidebar, permission to view, shortname/slug, function that outputs the html, icon, number to control how high in the menu it appears
     // Returns a hook name that can be used in the action adding CSS
@@ -50,8 +76,7 @@ class WordFilterPlugin {
     <?php }
  }
 
-
-  // Create plugin page
+  // Create plugin page - custom form handling
   function wordFilterPage() { ?>
     <div class="wrap">
       <h1>Word Filter</h1>
@@ -68,9 +93,20 @@ class WordFilterPlugin {
     </div>
   <?php }
 
-  // Create plugin page
+  // Create plugin sub-page - using WP formhandling instead of custom above
   function optionsSubPage() { ?>
-    Hello World from options subpage
+    <div class="wrap">
+      <h1>Word Filter Options</h1>
+      <form action="options.php" method="POST">
+        <?php
+          // Not registered under settings api, so need to call the error function specifically.
+          settings_errors();
+          settings_fields('replacementFields');
+          do_settings_sections('word-filter-options');
+          submit_button();
+        ?>
+      </form>
+    </div>
   <?php }
 }
 
